@@ -1,14 +1,34 @@
 const board = document.querySelector('.board');
+const startButton = document.querySelector('.btn-start');
+const modal = document.querySelector('.modal');
+const startGameModal = document.querySelector('.start-game');
+const gameOverModal = document.querySelector('.game-over');
+const restartButton = document.querySelector('.btn-restart');
+
+const highScoreElement = document.querySelector('.high-score');  
+const scoreElement = document.querySelector('.score');
+const timeElement = document.querySelector('.time');  
+
+
 const blockHeight = 50;
 const blockWidth = 50;
 
+let highScore = localStorage.getItem("highScore") || 0;
+let score = 0;
+let time = `00:00`;  
+
+highScoreElement.innerText = highScore;
+
+
 const cols = Math.floor(board.clientWidth / blockWidth);
 const rows = Math.floor(board.clientHeight / blockHeight);
+
 let intervalId = null;
+let timerIntervalId = null;
 let food = {x:Math.floor(Math.random()*rows), y:Math.floor(Math.random()*cols)};
 
 const blocks = [];
-const snake = [{
+let snake = [{
     x:1,y:3
   }
 ];
@@ -19,13 +39,17 @@ for(let row = 0 ; row <rows; row++) {
         const block = document.createElement('div');
         block.classList.add('block');
         board.appendChild(block);
-        block.innerText = `${row},${col}`;
         blocks[`${row},${col}`] = block;
     }
 }
 
 
 function render(){
+     
+    // prevent rendering while modal is visible (prevents background play)
+    if (modal.style.display === 'flex') return;
+
+
 
     let head = null;
 
@@ -44,38 +68,141 @@ function render(){
         head = {x:snake[0].x - 1, y:snake[0].y};
     }
 
+    //wall collision logic
     if(head.x < 0 || head.y < 0 || head.x >= rows || head.y >= cols){
-        alert('Game Over');
         clearInterval(intervalId);
-    }
+        modal.style.display = 'flex';
+        startGameModal.style.display = 'none';
+        gameOverModal.style.display = 'flex';
+        return; 
+}
+/*Without this return:
 
+even after game over,
+
+the rest of render() continues running,
+
+snake.unshift(), snake.pop(), and fill() still run,
+
+this corrupts the snake state,
+
+so after restart, the first tick immediately breaks.
+
+Adding return stops snake update logic after death → restart works properly.*/
+
+
+    // food consumption logic
 
     if(head.x === food.x && head.y === food.y){
         blocks[`${food.x},${food.y}`].classList.remove('food');
         food = {x:Math.floor(Math.random()*rows), y:Math.floor(Math.random()*cols)};
         blocks[`${food.x},${food.y}`].classList.add('food');
-
         snake.unshift(head); //head appended in the front after eating food and length increases 
 
+        score += 10;
+        scoreElement.innerText = score;
+
+        if(score > highScore){
+            highScore = score;
+            localStorage.setItem('highScore', highScore.toString());
+            highScoreElement.innerText = highScore;   // ✅ ADDED FIX
+        }
+
+        
+
+    } else {
+
+        snake.forEach(segment=>{
+            blocks[`${segment.x},${segment.y}`].classList.remove('fill');
+        });
+
+        snake.unshift(head); //shurwaat mein ek element add karega hehe
+        snake.pop(); //last element remove karega
     }
 
-    snake.forEach(segment=>{
-        blocks[`${segment.x},${segment.y}`].classList.remove('fill');
-    });
 
-    snake.unshift(head); //shurwaat mein ek element add karega hehe
-    snake.pop(); //last element remove karega
-
-    
     snake.forEach(segment=>{
         console.log(blocks[`${segment.x},${segment.y}`].classList.add('fill'));
     })
 }
 
 
-intervalId = setInterval(()=>{
-    render();
-},300);
+
+startButton.addEventListener('click',()=> {
+    modal.style.display = 'none';
+
+    intervalId = setInterval(()=>{
+        render();
+    },300);
+
+    timerIntervalId = setInterval(()=> {
+    let [mins, secs] = time.split(':').map(Number);
+
+    if (secs === 59) {
+        mins += 1;
+        secs = 0;
+    } else {
+        secs += 1;
+    }
+
+    // format with leading zero
+    const mm = mins.toString().padStart(2, '0');
+    const ss = secs.toString().padStart(2, '0');
+
+    time = `${mm}:${ss}`;
+    timeElement.innerText = time;
+}, 1000);
+
+});
+
+
+
+
+function restartGame() {
+    clearInterval(intervalId);
+    clearInterval(timerIntervalId);
+
+    blocks[`${food.x},${food.y}`].classList.remove('food');
+    snake.forEach(segment=>{
+        blocks[`${segment.x},${segment.y}`].classList.remove('fill');
+    });
+
+    modal.style.display = 'none';
+    startGameModal.style.display = 'none';
+    gameOverModal.style.display = 'none';  // ← MUST ADD THIS
+
+    direction = 'down';
+    snake = [{x:1,y:3}];
+
+    // ✅ FIXED: removed the extra closing bracket ]
+    food = {x:Math.floor(Math.random()*rows), y:Math.floor(Math.random()*cols)};
+
+    blocks[`${snake[0].x},${snake[0].y}`].classList.add('fill');
+    blocks[`${food.x},${food.y}`].classList.add('food');
+
+
+    score = 0;
+    time = `00:00`;
+
+    scoreElement.innerText = score;
+    timeElement.innerText = time;
+    highScoreElement.innerText = highScore;
+
+    intervalId = setInterval(()=>{ render(); }, 300);
+
+    timerIntervalId = setInterval(()=> {
+        let [mins, secs] = time.split(':').map(Number);
+        secs++;
+        if (secs === 60) { mins++; secs = 0; }
+        time = `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+        timeElement.innerText = time;
+    }, 1000);
+}
+restartButton.addEventListener('click', restartGame);
+
+
+
+
 
 
 addEventListener('keydown',(event)=> {
