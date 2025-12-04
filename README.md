@@ -1,4 +1,4 @@
-# 🐍 Snake Game
+# 🐍 Snake Game 
 
 A fully functional Snake Game built using **HTML, CSS, and JavaScript**.
 Created during my Sem 5 holidays to revise core JavaScript concepts like DOM manipulation, game loops, rendering logic, timers, and responsive layouts.
